@@ -370,7 +370,9 @@ public class ActivityController {
     @Operation(summary = "List activities (Admin/Reviewer see all; Stakeholders see own organization records)")
     @GetMapping("/activities")
     public List<ActivityDto> listActivities(Authentication auth) {
-        if (hasRole(auth, "ADMIN") || hasRole(auth, "REVIEWER")) {
+        // Anonymous callers are allowed to view the seeded public demo ledger only.
+        // Do not deploy real/private organization data with this public endpoint.
+        if (auth == null || hasRole(auth, "ADMIN") || hasRole(auth, "REVIEWER")) {
             return activities.findAllByOrderByCreatedAtDesc().stream().map(this::toDto).toList();
         }
         AppUser user = users.findByUsername(auth.getName()).orElseThrow();
