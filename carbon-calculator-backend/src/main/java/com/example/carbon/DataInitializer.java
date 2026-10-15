@@ -156,8 +156,7 @@ public class DataInitializer {
     }
 
     private void seedClimatiqFactors(EmissionFactorRepository factors) {
-        if (factors.count() == 0) {
-            factors.saveAll(List.of(
+        List<EmissionFactor> seedFactors = List.of(
                     // Scope 1
                     new EmissionFactor(
                             "CLIM-S1-NATGAS-DEFRA", "Natural Gas Stationary Combustion (100% Gross CV)",
@@ -373,7 +372,13 @@ public class DataInitializer {
                             "Open Government Licence v3.0", false,
                             "End-of-life disassembly, shredding and circular metal recovery credit accounting."
                     )
-            ));
+            );
+
+        // Seed only missing factors so partially populated databases are repaired safely.
+        for (EmissionFactor factor : seedFactors) {
+            if (factors.findByFactorCode(factor.factorCode).isEmpty()) {
+                factors.save(factor);
+            }
         }
     }
 
@@ -635,7 +640,11 @@ public class DataInitializer {
     ) {
         // Make sample activity seeding safe to rerun on an existing persistent database.
         if (eventKey != null && activities.findByEventKey(eventKey).isPresent()) return;
-        EmissionFactor factor = factors.findByFactorCode(factorCode).orElseThrow();
+        EmissionFactor factor = factors.findByFactorCode(factorCode)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Missing emission factor '" + factorCode + "' required for seed activity '" + activityName
+                                + "'. Verify seedClimatiqFactors() and the emission_factors table."
+                ));
         CalculationEngine.CalculationResult calc = engine.calculate(
                 inputQty, inputUnit, factor, allocNum, allocDenom,
                 shippedMassTonnes, distanceKm, gasSpecificName
