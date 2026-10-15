@@ -61,6 +61,22 @@ public class SecurityConfig {
                         // Logistics transfer legs mutation
                         .requestMatchers(HttpMethod.POST, "/api/transfers/**").hasAnyRole("ADMIN", "STAKEHOLDER")
 
+                        // Public read-only demo endpoints. Never add POST/PUT/PATCH/DELETE here.
+                        // Publish only seeded/demo data on a public deployment.
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/organizations",
+                                "/api/facilities",
+                                "/api/products",
+                                "/api/batches",
+                                "/api/categories",
+                                "/api/category-status",
+                                "/api/factors",
+                                "/api/activities",
+                                "/api/transfers",
+                                "/api/batches/*/summary",
+                                "/api/reports/organization-inventory"
+                        ).permitAll()
+
                         // Authenticated read endpoints
                         .requestMatchers(HttpMethod.GET,
                                 "/api/me",
