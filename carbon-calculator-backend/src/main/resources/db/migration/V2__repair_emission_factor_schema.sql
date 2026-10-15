@@ -8,10 +8,6 @@ ALTER TABLE IF EXISTS public.emission_factors
 ALTER TABLE IF EXISTS public.emission_factors
     ADD COLUMN IF NOT EXISTS scope VARCHAR(32);
 
-ALTER TABLE IF EXISTS public.emission_factors
-    ADD COLUMN IF NOT EXISTS is_market_based_alternative BOOLEAN
-    NOT NULL DEFAULT FALSE;
-
 -- Restore category codes for known seeded factors.
 UPDATE public.emission_factors
 SET category_code = CASE
