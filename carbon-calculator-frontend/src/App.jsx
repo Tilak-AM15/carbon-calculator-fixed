@@ -152,7 +152,7 @@ export default function App() {
 
   const headers = useMemo(() => ({
     'Content-Type': 'application/json',
-    ...(auth ? { Authorization: `Basic ${auth}` } : {})
+    ...(auth && auth !== 'GUEST' ? { Authorization: `Basic ${auth}` } : {})
   }), [auth])
 
   async function api(path, options = {}) {
@@ -178,19 +178,49 @@ export default function App() {
     if (!currentAuth) return
     setError('')
     try {
-      const [u, c, cs, f, a, orgs, facs, bSum, inv, tr, aud] = await Promise.all([
-        api('/api/me'),
-        api('/api/categories'),
-        api('/api/category-status'),
-        api('/api/factors'),
-        api('/api/activities'),
-        api('/api/organizations'),
-        api('/api/facilities'),
-        api(`/api/batches/${encodeURIComponent(currentBatchId)}/summary`),
-        api('/api/reports/organization-inventory'),
-        api(`/api/transfers?batchId=${encodeURIComponent(currentBatchId)}`),
-        api('/api/audit')
-      ])
+      // Guest mode is read-only and deliberately does not call authenticated /api/me or /api/audit.
+      const guest = currentAuth === 'GUEST'
+      const requests = guest
+        ? [
+            api('/api/categories'),
+            api('/api/category-status'),
+            api('/api/factors'),
+            api('/api/activities'),
+            api('/api/organizations'),
+            api('/api/facilities'),
+            api(`/api/batches/${encodeURIComponent(currentBatchId)}/summary`),
+            api('/api/reports/organization-inventory'),
+            api(`/api/transfers?batchId=${encodeURIComponent(currentBatchId)}`)
+          ]
+        : [
+            api('/api/me'),
+            api('/api/categories'),
+            api('/api/category-status'),
+            api('/api/factors'),
+            api('/api/activities'),
+            api('/api/organizations'),
+            api('/api/facilities'),
+            api(`/api/batches/${encodeURIComponent(currentBatchId)}/summary`),
+            api('/api/reports/organization-inventory'),
+            api(`/api/transfers?batchId=${encodeURIComponent(currentBatchId)}`),
+            api('/api/audit')
+          ]
+
+      const values = await Promise.all(requests)
+      let u, c, cs, f, a, orgs, facs, bSum, inv, tr, aud
+      if (guest) {
+        [c, cs, f, a, orgs, facs, bSum, inv, tr] = values
+        u = {
+          username: 'guest',
+          role: 'REVIEWER',
+          stakeholderRole: 'Read-only demo',
+          organizationName: 'Public demonstration'
+        }
+        aud = []
+      } else {
+        [u, c, cs, f, a, orgs, facs, bSum, inv, tr, aud] = values
+      }
+
       setMe(u)
       setCategories(c)
       setCategoryStatusList(cs)
@@ -203,15 +233,29 @@ export default function App() {
       setTransfers(tr)
       setAuditLogs(aud)
 
-      // Set form defaults based on user role
       setForm(prev => ({
         ...prev,
-        organizationName: u.role === 'ADMIN' ? prev.organizationName : u.organizationName,
+        organizationName: guest ? prev.organizationName : (u.role === 'ADMIN' ? prev.organizationName : u.organizationName),
         factorId: prev.factorId || String(f[0]?.id || '')
       }))
     } catch (e) {
       setError(e.message)
     }
+  }
+
+  function enterGuestMode() {
+    setError('')
+    setNotice('Viewing public demo in read-only mode. Sign in to make changes.')
+    setUsername('guest')
+    setPassword('')
+    setMe({
+      username: 'guest',
+      role: 'REVIEWER',
+      stakeholderRole: 'Read-only demo',
+      organizationName: 'Public demonstration'
+    })
+    setAuth('GUEST')
+    refresh('GUEST')
   }
 
   async function handleLogin(e, customUser, customPass) {
@@ -452,6 +496,16 @@ export default function App() {
               </button>
             </form>
 
+            <button
+              type="button"
+              onClick={enterGuestMode}
+              disabled={busy}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#b8d8c1] bg-white py-3.5 text-sm font-bold text-[#1b5537] hover:bg-[#eff7f1] disabled:opacity-60"
+            >
+              <Eye size={16} />
+              View Demo Without Signing In
+            </button>
+
             {/* Quick Demo Switcher Grid */}
             <div className="mt-7 rounded-2xl border border-[#e1eae1] bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
@@ -494,6 +548,11 @@ export default function App() {
   // Authenticated Application
   return (
     <div className="min-h-screen bg-[#f4f7f3] text-[#163828]">
+      {auth === 'GUEST' && (
+        <div className="fixed bottom-4 right-4 z-50 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 shadow-lg">
+          Read-only public demo — sign in to add or edit data.
+        </div>
+      )}
       {/* Sidebar Navigation */}
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[#e3eae2] bg-white px-5 py-6 transition-transform lg:translate-x-0 ${mobileNav ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between">
